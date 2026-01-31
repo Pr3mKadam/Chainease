@@ -1,0 +1,7 @@
+{
+  "name": "ChainEase Protocol",
+  "description": "A high-fidelity minimalist fintech transaction flow focused on calm UX and smart automation for secure payments.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
