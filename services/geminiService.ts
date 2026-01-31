@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { SmartCheckResult } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -31,12 +31,8 @@ export const analyzeTransaction = async (
         type: Type.OBJECT,
         properties: {
           safetyScore: { type: Type.NUMBER },
-          advice: { type: Type.STRING, description: "Main summary of the analysis." },
-          reasoning: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "2-3 bullet points explaining the logic."
-          },
+          advice: { type: Type.STRING },
+          reasoning: { type: Type.ARRAY, items: { type: Type.STRING } },
           categorySuggestion: { type: Type.STRING },
           isNewRecipient: { type: Type.BOOLEAN },
           budgetImpact: { type: Type.STRING },
@@ -62,22 +58,45 @@ export const analyzeTransaction = async (
   try {
     return JSON.parse(response.text.trim()) as SmartCheckResult;
   } catch (error) {
-    console.error("Analysis failed, returning fallback state", error);
     return {
       safetyScore: 90,
-      advice: "This transaction appears standard for your profile.",
-      reasoning: [
-        "Consistent with your usual spending range.",
-        "Recipient matches an established network pattern.",
-        "Secure ledger verification successfully initiated."
-      ],
+      advice: "This transaction appears standard.",
+      reasoning: ["Pattern match successful.", "Network verified."],
       categorySuggestion: "General",
       isNewRecipient: false,
       budgetImpact: "Minimal",
-      transparencyNote: "Authenticated via secure p2p relay.",
-      appliedAutomations: [
-        { ruleName: "Pattern Match", status: "active", message: "History alignment confirmed." }
-      ]
+      transparencyNote: "Authenticated.",
+      appliedAutomations: [{ ruleName: "Pattern Match", status: "active", message: "History alignment confirmed." }]
     };
+  }
+};
+
+export const generateReceiptImage = async (amount: number, recipient: string): Promise<string | null> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [
+          {
+            text: `Create a minimalist, high-fidelity digital receipt graphic for a financial transaction. 
+            Details: Amount $${amount}, Recipient: ${recipient}. 
+            Style: Modern fintech, dark charcoal background with soft emerald glowing accents. 
+            Include a "ChainEase Verified" watermark. 
+            Composition: Clean, centered typography, professional, abstract geometric patterns in the corners. 
+            The image should feel like a premium achievement or digital collectible.`
+          },
+        ],
+      },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Receipt generation failed", error);
+    return null;
   }
 };

@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { generateReceiptImage } from '../services/geminiService';
 
 interface StatusViewProps {
   amount: number;
@@ -10,6 +11,8 @@ interface StatusViewProps {
 export const StatusView: React.FC<StatusViewProps> = ({ amount, recipient, onDone }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   
   const steps = [
     { 
@@ -45,6 +48,7 @@ export const StatusView: React.FC<StatusViewProps> = ({ amount, recipient, onDon
           setCurrentStep(stepCount);
           if (stepCount === steps.length - 1) {
             setShowConfetti(true);
+            handleGenerateReceipt();
           }
           next();
         }, progress[stepCount]);
@@ -54,9 +58,24 @@ export const StatusView: React.FC<StatusViewProps> = ({ amount, recipient, onDon
     next();
   }, [steps.length]);
 
+  const handleGenerateReceipt = async () => {
+    setIsGenerating(true);
+    const url = await generateReceiptImage(amount, recipient);
+    setReceiptUrl(url);
+    setIsGenerating(false);
+  };
+
+  const handleDownload = () => {
+    if (!receiptUrl) return;
+    const link = document.createElement('a');
+    link.href = receiptUrl;
+    link.download = `ChainEase_Receipt_${Date.now()}.png`;
+    link.click();
+  };
+
   return (
     <div className="h-full flex flex-col justify-between py-4 animate-in fade-in duration-700 relative overflow-hidden">
-      {/* Confetti Generation for Demo Flair */}
+      {/* Confetti */}
       {showConfetti && Array.from({ length: 20 }).map((_, i) => (
         <div 
           key={i} 
@@ -87,7 +106,7 @@ export const StatusView: React.FC<StatusViewProps> = ({ amount, recipient, onDon
             </>
           )}
         </div>
-        <h2 className="text-4xl font-extrabold text-slate-900 tracking-tighter transition-all duration-500 transform ${currentStep === steps.length - 1 ? 'scale-110' : ''}">
+        <h2 className="text-4xl font-extrabold text-slate-900 tracking-tighter">
           ${amount.toLocaleString()}
         </h2>
         <p className="text-slate-400 text-sm mt-2 font-medium">To {recipient}</p>
@@ -111,7 +130,7 @@ export const StatusView: React.FC<StatusViewProps> = ({ amount, recipient, onDon
                   {step.label}
                 </p>
                 {idx < currentStep && (
-                   <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest animate-in fade-in zoom-in">Verified</span>
+                   <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Verified</span>
                 )}
               </div>
               <p className="text-[11px] text-slate-400 font-medium leading-tight mt-0.5">
@@ -128,14 +147,30 @@ export const StatusView: React.FC<StatusViewProps> = ({ amount, recipient, onDon
         ))}
       </div>
 
-      <div className="pb-8 px-4 z-20">
+      <div className="pb-8 px-4 z-20 space-y-3">
         {currentStep === steps.length - 1 ? (
-          <button 
-            onClick={onDone}
-            className="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-emerald-200"
-          >
-            Dashboard
-          </button>
+          <>
+            {receiptUrl ? (
+              <button 
+                onClick={handleDownload}
+                className="w-full bg-emerald-50 text-emerald-700 font-bold py-4 rounded-2xl border border-emerald-100 flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors animate-in slide-in-from-bottom-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <span>Save Smart Receipt</span>
+              </button>
+            ) : isGenerating ? (
+              <div className="w-full py-4 text-center">
+                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">Generating Proof of Transfer...</p>
+              </div>
+            ) : null}
+            
+            <button 
+              onClick={onDone}
+              className="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-emerald-200"
+            >
+              Back to Dashboard
+            </button>
+          </>
         ) : (
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
             <p className="text-[11px] text-slate-500 font-semibold italic">
@@ -144,6 +179,16 @@ export const StatusView: React.FC<StatusViewProps> = ({ amount, recipient, onDon
           </div>
         )}
       </div>
+
+      {/* Preview Mini-Modal (Optional: only if you want to show it) */}
+      {receiptUrl && (
+        <div className="absolute bottom-40 right-6 w-16 h-20 bg-white p-1 rounded-lg shadow-xl border border-slate-200 rotate-6 animate-in zoom-in-50 duration-500 cursor-pointer group" onClick={handleDownload}>
+           <img src={receiptUrl} alt="Receipt Preview" className="w-full h-full object-cover rounded shadow-inner grayscale group-hover:grayscale-0 transition-all" />
+           <div className="absolute -top-2 -right-2 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center text-white">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" /></svg>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
